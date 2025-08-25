@@ -27,7 +27,8 @@ jobs:
             tfvars: Environment/prod/terraform.tfvars
             gh_env: prod
 
-    environment: ${{ matrix.gh_env }}   # <- USE the env-level secrets/variables
+    environment: ${{ matrix.gh_env }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,10 +38,23 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Azure Login (Service Principal JSON)
+      # quick sanity: verify AZURE_CREDENTIALS shape without leaking values
+      - name: Check SP secret shape
+        run: |
+          node -e 'const j=JSON.parse(process.env.AZ_CREDS);
+                   ["clientId","tenantId","subscriptionId","clientSecret"].forEach(k=>{
+                     console.log(k, j[k] ? "ok" : "MISSING")
+                   })'
+        env:
+          AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Azure Login (Service Principal)
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id:        ${{ fromJSON(secrets.AZURE_CREDENTIALS).clientId }}
+          tenant-id:        ${{ fromJSON(secrets.AZURE_CREDENTIALS).tenantId }}
+          subscription-id:  ${{ fromJSON(secrets.AZURE_CREDENTIALS).subscriptionId }}
+          client-secret:    ${{ fromJSON(secrets.AZURE_CREDENTIALS).clientSecret }}
 
       - name: Export ARM vars for provider
         run: |
@@ -67,7 +81,7 @@ jobs:
         working-directory: ${{ matrix.chdir }}
         run: terraform validate
 
-      - name: Terraform Plan (FREE mode)
+      - name: Terraform Plan
         working-directory: ${{ matrix.chdir }}
         run: terraform plan -input=false -no-color -var-file="${{ matrix.tfvars }}" -var="enforce_free=true" -out=tfplan
 
