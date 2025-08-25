@@ -1,0 +1,78 @@
+name: Terraform Plan (dev & prod)
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "Environment/**"
+      - "Modules/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: plan ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - env: dev
+            chdir: Environment/dev
+            tfvars: Environment/dev/terraform.tfvars
+            gh_env: dev
+          - env: prod
+            chdir: Environment/prod
+            tfvars: Environment/prod/terraform.tfvars
+            gh_env: prod
+
+    environment: ${{ matrix.gh_env }}   # <- USE the env-level secrets/variables
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Azure Login (Service Principal JSON)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Export ARM vars for provider
+        run: |
+          echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          echo "ARM_USE_MSI=false" >> $GITHUB_ENV
+          echo "ARM_USE_OIDC=false" >> $GITHUB_ENV
+
+      - name: Terraform Init (Azure backend)
+        working-directory: ${{ matrix.chdir }}
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=${{ matrix.env }}.tfstate"
+        env:
+          ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+
+      - name: Terraform Fmt
+        working-directory: ${{ matrix.chdir }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        working-directory: ${{ matrix.chdir }}
+        run: terraform validate
+
+      - name: Terraform Plan (FREE mode)
+        working-directory: ${{ matrix.chdir }}
+        run: terraform plan -input=false -no-color -var-file="${{ matrix.tfvars }}" -var="enforce_free=true" -out=tfplan
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.env }}
+          path: ${{ matrix.chdir }}/tfplan
