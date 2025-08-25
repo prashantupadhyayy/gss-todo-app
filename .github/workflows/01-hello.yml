@@ -1,0 +1,16 @@
+name: Hello Actions
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}   # lets you run it manually from the Actions tab
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Say hi
+        run: echo "Hello, ${GITHUB_ACTOR}! GitHub Actions is working 🎉"
