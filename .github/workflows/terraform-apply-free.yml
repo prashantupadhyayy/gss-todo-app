@@ -1,14 +1,23 @@
-name: Terraform Apply (FREE only)
+name: Terraform Deploy (dev & prod)
 
 on:
-  workflow_dispatch: {}   # manual trigger only
+  workflow_dispatch: {}          # run manually when you want
+  push:
+    branches: [ main ]
+    paths:
+      - "Environment/**"
+      - "Modules/**"
 
 permissions:
   contents: read
 
+concurrency:
+  group: terraform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  apply:
-    name: apply ${{ matrix.env }} (free)
+  deploy:
+    name: deploy ${{ matrix.env }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,6 +32,7 @@ jobs:
             gh_env: prod
 
     environment: ${{ matrix.gh_env }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,10 +42,13 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Azure Login (Service Principal JSON)
+      - name: Azure Login (Service Principal)
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id:        ${{ fromJSON(secrets.AZURE_CREDENTIALS).clientId }}
+          tenant-id:        ${{ fromJSON(secrets.AZURE_CREDENTIALS).tenantId }}
+          subscription-id:  ${{ fromJSON(secrets.AZURE_CREDENTIALS).subscriptionId }}
+          client-secret:    ${{ fromJSON(secrets.AZURE_CREDENTIALS).clientSecret }}
 
       - name: Export ARM vars for provider
         run: |
@@ -54,10 +67,10 @@ jobs:
         env:
           ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
 
-      - name: Terraform Plan (FREE mode)
+      - name: Terraform Plan
         working-directory: ${{ matrix.chdir }}
         run: terraform plan -input=false -no-color -var-file="${{ matrix.tfvars }}" -var="enforce_free=true" -out=tfplan
 
-      - name: Terraform Apply (FREE mode)
+      - name: Terraform Apply
         working-directory: ${{ matrix.chdir }}
         run: terraform apply -input=false -auto-approve tfplan
