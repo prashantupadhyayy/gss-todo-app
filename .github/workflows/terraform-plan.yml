@@ -18,31 +18,27 @@ jobs:
         include:
           - env: dev
             chdir: Environment/dev
-            tfvars: Environment/dev/terraform.tfvars
+            tfvars: Environment/dev/dev.tfvars         # <- fixed
             gh_env: gss-dev
           - env: prod
             chdir: Environment/prod
-            tfvars: Environment/prod/terraform.tfvars
+            tfvars: Environment/prod/prod.tfvars       # <- fixed
             gh_env: gss-prod
 
     environment: ${{ matrix.gh_env }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
-      # Login using SP JSON stored in the environment secret "AZURE_CREDENTIALS"
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Tell the azurerm provider to use the Service Principal (not Azure CLI user)
       - name: Export ARM_* for Terraform (Service Principal)
         run: |
           echo "ARM_CLIENT_ID=${{ fromJSON(secrets.AZURE_CREDENTIALS).clientId }}" >> $GITHUB_ENV
@@ -50,7 +46,6 @@ jobs:
           echo "ARM_TENANT_ID=${{ fromJSON(secrets.AZURE_CREDENTIALS).tenantId }}" >> $GITHUB_ENV
           echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
 
-      # Backend config values come from environment variables in gss-dev / gss-prod
       - name: Terraform Init (Azure backend)
         working-directory: ${{ matrix.chdir }}
         run: |
@@ -60,10 +55,8 @@ jobs:
             -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
             -backend-config="key=${{ matrix.env }}.tfstate"
         env:
-          # If you use access-keys for backend auth; remove if you moved to AAD blob RBAC
           ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
 
-      # Auto-format (no -check to avoid failing your CI)
       - name: Terraform Fmt
         working-directory: ${{ matrix.chdir }}
         run: terraform fmt -recursive
@@ -75,9 +68,3 @@ jobs:
       - name: Terraform Plan
         working-directory: ${{ matrix.chdir }}
         run: terraform plan -input=false -no-color -var-file="${{ matrix.tfvars }}" -var="enforce_free=true" -out=tfplan
-
-      - name: Upload plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ matrix.env }}
-          path: ${{ matrix.chdir }}/tfplan
