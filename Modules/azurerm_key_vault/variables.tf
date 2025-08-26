@@ -31,9 +31,9 @@ variable "purge_protection_enabled" {
 
 variable "access_policies" {
   type = map(object({
-    object_id              = string
-    secret_permissions     = list(string)
-    key_permissions        = list(string)
+    object_id               = string
+    secret_permissions      = list(string)
+    key_permissions         = list(string)
     certificate_permissions = optional(list(string), [])
     storage_permissions     = optional(list(string), [])
   }))

@@ -8,5 +8,5 @@ resource "azurerm_mssql_database" "db" {
   tags           = var.tags
 }
 
-output "id"   { value = azurerm_mssql_database.db.id }
+output "id" { value = azurerm_mssql_database.db.id }
 output "name" { value = azurerm_mssql_database.db.name }

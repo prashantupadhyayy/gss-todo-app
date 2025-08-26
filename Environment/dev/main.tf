@@ -3,17 +3,17 @@ locals {
   tags      = merge(var.tags, { environment = var.env, project = var.project })
 
   # names
-  rg_name         = "${upper(replace(local.base_name, "-", " "))}-${upper(var.env)}-RG"
-  mi_name         = "${local.base_name}-${var.env}-mi"
-  kv_base         = substr(replace(local.base_name, "-", ""), 0, 20)
-  kv_name         = "${local.kv_base}${var.env}kv"
-  sa_prefix       = substr("${replace(local.base_name, "-", "")}${var.env}", 0, 18)
+  rg_name   = "${upper(replace(local.base_name, "-", " "))}-${upper(var.env)}-RG"
+  mi_name   = "${local.base_name}-${var.env}-mi"
+  kv_base   = substr(replace(local.base_name, "-", ""), 0, 20)
+  kv_name   = "${local.kv_base}${var.env}kv"
+  sa_prefix = substr("${replace(local.base_name, "-", "")}${var.env}", 0, 18)
 
   sql_server_name = "${local.base_name}-${var.env}-sql"
   sql_db_name     = "${local.base_name}-${var.env}-db"
 
   # NEW:
-  acr_name  = substr("${replace(local.base_name, "-", "")}${var.env}acr", 0, 50)
+  acr_name = substr("${replace(local.base_name, "-", "")}${var.env}acr", 0, 50)
 
   aks_name   = "${local.base_name}-${var.env}-aks"
   dns_prefix = replace("${local.base_name}-${var.env}", "_", "-")
