@@ -3,9 +3,7 @@ name: Terraform Plan (dev & prod)
 on:
   pull_request:
     branches: [ main ]
-    paths:
-      - "Environment/**"
-      - "Modules/**"
+    paths: [ "Environment/**", "Modules/**" ]
   workflow_dispatch: {}
 
 permissions:
@@ -36,7 +34,7 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # Login with Service Principal JSON stored in AZURE_CREDENTIALS
+      # must exist in that environment: AZURE_CREDENTIALS (SP JSON), ARM_SUBSCRIPTION_ID
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -48,6 +46,8 @@ jobs:
           echo "ARM_USE_MSI=false" >> $GITHUB_ENV
           echo "ARM_USE_OIDC=false" >> $GITHUB_ENV
 
+      # backend names must exist as environment variables in that env:
+      # TF_STATE_RG, TF_STATE_SA, TF_STATE_CONTAINER
       - name: Terraform Init (Azure backend)
         working-directory: ${{ matrix.chdir }}
         run: |
@@ -57,7 +57,7 @@ jobs:
             -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
             -backend-config="key=${{ matrix.env }}.tfstate"
         env:
-          ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+          ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}   # optional if you use AAD RBAC
 
       - name: Terraform Fmt
         working-directory: ${{ matrix.chdir }}
